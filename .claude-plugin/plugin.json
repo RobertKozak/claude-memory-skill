@@ -1,0 +1,17 @@
+{
+  "name": "claude-memory",
+  "version": "1.0.0",
+  "description": "Persistent memory for Claude Code using markdown files. Remembers your preferences, project context, and work history across sessions.",
+  "author": {
+    "name": "Robert Kozak"
+  },
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "continuity",
+    "context",
+    "persistence",
+    "productivity"
+  ],
+  "hooks": "./.claude-plugin/hooks/hooks.json"
+}
