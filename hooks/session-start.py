@@ -21,6 +21,23 @@ def get_project_name() -> str:
     return os.path.basename(os.getcwd())
 
 
+def get_user_name() -> str | None:
+    """Extract user name from profile.md, if saved."""
+    try:
+        profile = (MEMORY_DIR / "profile.md").read_text()
+        for line in profile.splitlines():
+            if "name:" in line.lower():
+                # e.g. "- Name: Robert" or "Name: Robert"
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    name = parts[1].strip()
+                    if name:
+                        return name
+    except Exception:
+        pass
+    return None
+
+
 def read_file_safe(path: Path) -> str | None:
     """Read a file, returning None if it doesn't exist or is empty."""
     try:
@@ -85,12 +102,25 @@ def build_context() -> str:
     if not parts:
         return ""
 
+    # Build greeting directive
+    name = get_user_name()
+    greeting_name = f" {name}" if name else ""
+    greeting_directive = (
+        f"Greet the user as '{greeting_name.strip() or 'there'}' by name on session start. "
+        if name else
+        "Greet the user warmly on session start. "
+    )
+
     # Wrap everything in instructions
     header = (
         "**Claude Memory — Context from previous sessions.**\n"
         "The information below was saved from past sessions. "
         "Use it to provide continuity — remember preferences, "
         "pick up where you left off, and avoid re-asking things the user already told you.\n"
+        f"{greeting_directive}"
+        "Reference the last thing worked on from the project memory. "
+        "If there is a 'Next up' section, offer it as a suggestion for what to continue. "
+        "Keep the greeting brief and natural.\n"
         "Memory is stored in `~/.claude/memory/`. "
         "The user can run `/remember`, `/recall`, or `/status` to manage it.\n"
     )
@@ -110,6 +140,18 @@ def main():
         # Ensure memory directory exists
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         (MEMORY_DIR / "projects").mkdir(exist_ok=True)
+
+        # Initialize project memory file if this is the first session
+        project = get_project_name()
+        project_file = MEMORY_DIR / "projects" / f"{project}.md"
+        if not project_file.exists():
+            now = datetime.now().strftime("%Y-%m-%d %H:%M")
+            name = get_user_name() or "Unknown"
+            project_file.write_text(
+                f"## Project\n{project}\n\n"
+                f"## User\n{name}\n\n"
+                f"## Session\n{now}\n"
+            )
 
         # Build context
         context = build_context()

@@ -190,6 +190,17 @@ def build_summary(session_data: dict) -> str:
     return "\n".join(parts)
 
 
+def append_to_session_notes(project: str, summary: str) -> None:
+    """Append a session summary entry to SESSION_NOTES.md."""
+    notes_file = MEMORY_DIR / "SESSION_NOTES.md"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    entry = f"\n---\n\n## {timestamp} — {project}\n\n{summary}\n"
+    if notes_file.exists():
+        notes_file.write_text(notes_file.read_text() + entry)
+    else:
+        notes_file.write_text(f"# Session Notes\n{entry}")
+
+
 def main() -> int:
     """Main entry point."""
     try:
@@ -199,14 +210,18 @@ def main() -> int:
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         (MEMORY_DIR / "projects").mkdir(exist_ok=True)
 
+        project = get_project_name(session_data.get("cwd"))
+
         # Build session summary
         summary = build_summary(session_data)
 
-        # Only save if we have meaningful content
+        # Update project memory file
         if len(summary) > 50:
-            project = get_project_name(session_data.get("cwd"))
             project_file = MEMORY_DIR / "projects" / f"{project}.md"
             project_file.write_text(summary)
+
+        # Always append to SESSION_NOTES.md
+        append_to_session_notes(project, summary)
 
         # Update last session timestamp
         session_file = MEMORY_DIR / ".last-session"
