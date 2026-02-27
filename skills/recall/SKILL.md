@@ -1,11 +1,9 @@
 ---
 name: recall
-description: Show what Claude remembers about you and this project
-args:
-  - query
+description: Show what Claude remembers about you and this project. Use when the user asks "what do you know about me" or wants to see saved context.
 ---
 
-The user wants to see what's in memory. {{#if query}}They're specifically asking about: **{{query}}**{{/if}}
+The user wants to see what's in memory. They asked: **$ARGUMENTS**
 
 ## Instructions
 
@@ -15,13 +13,9 @@ The user wants to see what's in memory. {{#if query}}They're specifically asking
 
 Present the results clearly:
 
-{{#if query}}
-- Filter and highlight entries relevant to "{{query}}"
-- If nothing matches, say so
-{{else}}
-- Show all saved memory organized by section
+- If the user asked about something specific, filter and highlight relevant entries
+- Otherwise show all saved memory organized by section
 - Show when the last session was
-{{/if}}
 
 ### Output format
 

@@ -1,6 +1,6 @@
 ---
 name: status
-description: Show memory system status and storage details
+description: Show memory system status and storage details. Use when the user wants to see how much is stored.
 ---
 
 Show the current state of the Claude Memory system.
@@ -33,6 +33,6 @@ Present a clean status overview:
 [timestamp and how long ago]
 ```
 
-Use the Bash tool with `ls -lh` and `wc -l` to get file sizes and line counts. Use the Read tool to read file contents.
+Use the Bash tool with `ls -lh` to get file sizes. Use the Read tool to read file contents.
 
 If the memory directory doesn't exist at all, inform the user that the plugin is installed but no memories have been saved yet. Suggest using `/remember` to get started.

@@ -1,11 +1,9 @@
 ---
 name: remember
-description: Save something to Claude's persistent memory
-args:
-  - what
+description: Save something to Claude's persistent memory. Use when the user says "remember this", "always do X", or wants to save a preference.
 ---
 
-The user wants to save something to persistent memory: **{{what}}**
+The user wants to save something to persistent memory: **$ARGUMENTS**
 
 ## Instructions
 
