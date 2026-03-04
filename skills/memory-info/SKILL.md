@@ -1,5 +1,5 @@
 ---
-name: status
+name: memory-info
 description: Show memory system status and storage details. Use when the user wants to see how much is stored.
 ---
 
@@ -34,5 +34,22 @@ Present a clean status overview:
 ```
 
 Use the Bash tool with `ls -lh` to get file sizes. Use the Read tool to read file contents.
+
+For token counts, use `uv run python3` with tiktoken:
+
+```python
+import os, tiktoken
+enc = tiktoken.encoding_for_model('gpt-4')
+files = ['~/.claude/memory/profile.md', '~/.claude/memory/SESSION_NOTES.md', ...]
+for f in files:
+    path = os.path.expanduser(f)
+    if os.path.exists(path):
+        tokens = len(enc.encode(open(path).read()))
+        print(f'{tokens} tokens  {os.path.basename(f)}')
+```
+
+If tiktoken is not available, fall back to the ~4 chars/token heuristic and note it's estimated.
+
+Include a token count column in the Project Memories table and show total tokens at the bottom.
 
 If the memory directory doesn't exist at all, inform the user that the plugin is installed but no memories have been saved yet. Suggest using `/remember` to get started.

@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Claude local settings
+.claude/
+
+# macOS
+.DS_Store

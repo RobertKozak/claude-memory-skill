@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 """
 SessionStart hook — Reads memory files and injects them into context.
 
@@ -12,13 +12,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-
-MEMORY_DIR = Path.home() / ".claude" / "memory"
-
-
-def get_project_name() -> str:
-    """Get project name from current working directory."""
-    return os.path.basename(os.getcwd())
+sys.path.insert(0, str(Path(__file__).parent))
+from memory_utils import (
+    MEMORY_DIR,
+    get_project_name,
+    read_file_safe,
+    get_last_session_notes,
+)
 
 
 def get_user_name() -> str | None:
@@ -27,22 +27,11 @@ def get_user_name() -> str | None:
         profile = (MEMORY_DIR / "profile.md").read_text()
         for line in profile.splitlines():
             if "name:" in line.lower():
-                # e.g. "- Name: Robert" or "Name: Robert"
                 parts = line.split(":", 1)
                 if len(parts) == 2:
                     name = parts[1].strip()
                     if name:
                         return name
-    except Exception:
-        pass
-    return None
-
-
-def read_file_safe(path: Path) -> str | None:
-    """Read a file, returning None if it doesn't exist or is empty."""
-    try:
-        if path.exists() and path.stat().st_size > 0:
-            return path.read_text().strip()
     except Exception:
         pass
     return None
@@ -78,9 +67,9 @@ def format_time_since(timestamp_str: str) -> str:
         return "some time ago"
 
 
-def build_context() -> str:
+def build_context(cwd: str = None) -> str:
     """Build the context injection from memory files."""
-    project = get_project_name()
+    project = get_project_name(cwd)
     parts = []
 
     # --- User Profile ---
@@ -88,16 +77,26 @@ def build_context() -> str:
     if profile:
         parts.append(f"## Your Preferences\n\n{profile}")
 
-    # --- Project Memory ---
-    project_memory = read_file_safe(MEMORY_DIR / "projects" / f"{project}.md")
-    if project_memory:
-        parts.append(f"## Project: {project}\n\n{project_memory}")
+    # --- Last Session Notes (most recent entry for this project) ---
+    last_notes = get_last_session_notes(project)
+    if last_notes:
+        parts.append(f"## Last Session Notes\n\n{last_notes}")
 
     # --- Time Context ---
     last_session_str = read_file_safe(MEMORY_DIR / ".last-session")
     if last_session_str:
         time_ago = format_time_since(last_session_str)
-        parts.append(f"## Session Context\n\nLast session was **{time_ago}**.")
+        try:
+            last_dt = datetime.fromisoformat(last_session_str)
+            last_fmt = last_dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            last_fmt = last_session_str.strip()
+        parts.append(f"## Session Context\n\nLast session was **{time_ago}** ({last_fmt}).")
+
+    # --- Startup Prompt ---
+    startup_prompt = read_file_safe(MEMORY_DIR / "startup-prompt.md")
+    if startup_prompt:
+        parts.append(f"## Startup Prompt\n\n{startup_prompt}")
 
     if not parts:
         return ""
@@ -111,7 +110,6 @@ def build_context() -> str:
         "Greet the user warmly on session start. "
     )
 
-    # Wrap everything in instructions
     header = (
         "**Claude Memory — Context from previous sessions.**\n"
         "The information below was saved from past sessions. "
@@ -122,39 +120,36 @@ def build_context() -> str:
         "If there is a 'Next up' section, offer it as a suggestion for what to continue. "
         "Keep the greeting brief and natural.\n"
         "Memory is stored in `~/.claude/memory/`. "
-        "The user can run `/remember`, `/recall`, or `/status` to manage it.\n"
+        "The user can run `/remember`, `/recall`, or `/memory-info` to manage it.\n"
     )
 
     return header + "\n\n" + "\n\n---\n\n".join(parts)
 
 
+def read_session_data() -> dict:
+    """Read session data from stdin (provided by Claude Code)."""
+    try:
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+        return {
+            "session_id": data.get("session_id", "unknown"),
+            "cwd": data.get("cwd") or os.getcwd(),
+        }
+    except Exception:
+        return {"session_id": "unknown", "cwd": os.getcwd()}
+
+
 def main():
     """Main entry point."""
     try:
-        # Read session data from stdin (provided by Claude Code)
-        try:
-            json.loads(sys.stdin.buffer.read().decode("utf-8"))
-        except Exception:
-            pass
+        session_data = read_session_data()
+        cwd = session_data.get("cwd")
 
         # Ensure memory directory exists
         MEMORY_DIR.mkdir(parents=True, exist_ok=True)
         (MEMORY_DIR / "projects").mkdir(exist_ok=True)
 
-        # Initialize project memory file if this is the first session
-        project = get_project_name()
-        project_file = MEMORY_DIR / "projects" / f"{project}.md"
-        if not project_file.exists():
-            now = datetime.now().strftime("%Y-%m-%d %H:%M")
-            name = get_user_name() or "Unknown"
-            project_file.write_text(
-                f"## Project\n{project}\n\n"
-                f"## User\n{name}\n\n"
-                f"## Session\n{now}\n"
-            )
-
         # Build context
-        context = build_context()
+        context = build_context(cwd)
 
         if context:
             full_context = f"<system-reminder>\n{context}\n</system-reminder>"
@@ -166,7 +161,6 @@ def main():
                 "</system-reminder>"
             )
 
-        # Output for Claude Code
         result = {
             "hookSpecificOutput": {
                 "hookEventName": "SessionStart",
@@ -180,7 +174,6 @@ def main():
         return 0
 
     except Exception as e:
-        # Never crash — just skip injection
         sys.stderr.write(f"claude-memory session-start: {e}\n")
         return 0
 

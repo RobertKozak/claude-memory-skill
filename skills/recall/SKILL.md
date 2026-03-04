@@ -3,7 +3,7 @@ name: recall
 description: Show what Claude remembers about you and this project. Use when the user asks "what do you know about me" or wants to see saved context.
 ---
 
-The user wants to see what's in memory. They asked: **$ARGUMENTS**
+The user ran `/recall`. Load memory into context silently.
 
 ## Instructions
 
@@ -11,23 +11,8 @@ The user wants to see what's in memory. They asked: **$ARGUMENTS**
 2. Read `~/.claude/memory/projects/{project_name}.md` (project-specific memory, where `{project_name}` is the current directory name)
 3. Read `~/.claude/memory/.last-session` (last session timestamp)
 
-Present the results clearly:
+Do NOT dump the raw file contents to the user. Instead, internalize the information and respond naturally based on the query in `$ARGUMENTS`:
 
-- If the user asked about something specific, filter and highlight relevant entries
-- Otherwise show all saved memory organized by section
-- Show when the last session was
-
-### Output format
-
-```
-## Profile (global preferences)
-[contents of profile.md, or "No preferences saved yet"]
-
-## Project: {name}
-[contents of project memory, or "No project memory yet"]
-
-## Last session
-[when the last session ended]
-```
-
-If both files are empty or missing, let the user know they can use `/remember` to start saving things.
+- If `$ARGUMENTS` is empty, briefly acknowledge that memory is loaded and you're ready
+- If `$ARGUMENTS` contains a specific question or topic, answer it directly using what you just read
+- If files are missing or empty, let the user know there's nothing saved yet and they can use `/remember`

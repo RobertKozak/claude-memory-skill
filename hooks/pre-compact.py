@@ -1,10 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 """
-PreCompact hook — Re-injects memory before context compression.
+PreCompact hook — Saves a session snapshot and re-injects memory before context compression.
 
-When Claude Code compacts the conversation (approaching context limit),
-this hook ensures your profile and project memory survive the compression.
-Without this, Claude would lose all the context injected at session start.
+When Claude Code compacts the conversation (approaching context limit), this hook:
+1. Saves the current session state to project memory (snapshot)
+2. Re-injects all memory so it survives compaction
+
+Without this, Claude would lose all context injected at session start.
 """
 
 import json
@@ -12,37 +14,59 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from memory_utils import (
+    MEMORY_DIR,
+    get_project_name,
+    read_file_safe,
+    build_summary,
+    append_session_entry,
+    get_last_session_notes,
+)
 
-MEMORY_DIR = Path.home() / ".claude" / "memory"
 
-
-def get_project_name() -> str:
-    """Get project name from current working directory."""
-    return os.path.basename(os.getcwd())
-
-
-def read_file_safe(path: Path) -> str | None:
-    """Read a file, returning None if it doesn't exist or is empty."""
+def read_session_data() -> dict:
+    """Read session data from stdin (provided by Claude Code)."""
     try:
-        if path.exists() and path.stat().st_size > 0:
-            return path.read_text().strip()
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+        return {
+            "session_id": data.get("session_id", "unknown"),
+            "transcript_path": data.get("transcript_path", ""),
+            "cwd": data.get("cwd") or os.getcwd(),
+        }
     except Exception:
-        pass
-    return None
+        return {
+            "session_id": "unknown",
+            "transcript_path": "",
+            "cwd": os.getcwd(),
+        }
 
 
-def build_memory_injection() -> str:
+def save_session_snapshot(session_data: dict) -> None:
+    """Save current session state to project memory file."""
+    try:
+        project = get_project_name(session_data.get("cwd"))
+        summary = build_summary(session_data)
+
+        if len(summary) > 50:
+            append_session_entry(project, summary, session_data.get("session_id", "unknown"))
+
+    except Exception as e:
+        sys.stderr.write(f"claude-memory pre-compact snapshot: {e}\n")
+
+
+def build_memory_injection(cwd: str = None) -> str:
     """Build memory context to preserve through compaction."""
-    project = get_project_name()
+    project = get_project_name(cwd)
     parts = []
 
     profile = read_file_safe(MEMORY_DIR / "profile.md")
     if profile:
         parts.append(f"## Your Preferences\n\n{profile}")
 
-    project_memory = read_file_safe(MEMORY_DIR / "projects" / f"{project}.md")
-    if project_memory:
-        parts.append(f"## Project: {project}\n\n{project_memory}")
+    last_notes = get_last_session_notes(project)
+    if last_notes:
+        parts.append(f"## Last Session Notes\n\n{last_notes}")
 
     if not parts:
         return "Claude Memory plugin active. No saved memories to preserve."
@@ -56,15 +80,15 @@ def build_memory_injection() -> str:
 
 
 def main():
-    """Main entry point."""
     try:
-        # Read hook input from stdin
-        try:
-            json.loads(sys.stdin.read())
-        except Exception:
-            pass
+        session_data = read_session_data()
 
-        memory = build_memory_injection()
+        MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+        (MEMORY_DIR / "projects").mkdir(exist_ok=True)
+
+        save_session_snapshot(session_data)
+
+        memory = build_memory_injection(session_data.get("cwd"))
 
         output = {
             "decision": "continue",
@@ -76,7 +100,6 @@ def main():
 
     except Exception as e:
         sys.stderr.write(f"claude-memory pre-compact: {e}\n")
-        # Fallback — don't break compaction
         print(json.dumps({
             "decision": "continue",
             "user_message": "<system-reminder>Claude Memory plugin active.</system-reminder>",
