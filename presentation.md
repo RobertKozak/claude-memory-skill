@@ -86,8 +86,6 @@ style: |
 
 **A simple file-based setup using hooks and markdown**
 
-Robert Kozak · March 2026
-
 ---
 
 # The Problem
@@ -97,13 +95,38 @@ Claude Code is powerful — but it forgets **everything** between sessions.
 - No memory of your name, preferences, or work style
 - No context about what you worked on last time
 - You repeat yourself every single session
-- You could use 'claude --resume xxxx' but has extra context you might not need
 
 > Every session starts from zero.
 
 ---
 
-# The Solution
+# What's Built in
+
+Claude does have some simple memory management
+
+- You could use 'claude --resume xxxx' but has extra context you might not need
+- /memory command for CLAUDE.md (user and project)
+
+---
+
+# What's built in - Auto memory
+
+- Claude will save to these files when it thinks its worth remembering
+- It doesnt save every session
+- First 200 lines of MEMORY.md is loaded into context at start
+- Acts as index into other files in memory folder
+
+```
+~/.claude/projects/<project>/memory/
+├── MEMORY.md          # Concise index, loaded into every session
+├── debugging.md       # Detailed notes on debugging patterns
+├── api-conventions.md # API design decisions
+└── ...                # Any other topic files Claude creates
+```
+
+---
+
+# Rolling our own
 
 A lightweight setup that gives Claude **persistent memory** using:
 

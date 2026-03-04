@@ -1,5 +1,7 @@
 # claude-memory-skill
 
+A simple (very simple) memory system for claude. Maybe better just use Claude Code Auto memory:[Auto memory](https://code.claude.com/docs/en/memory#auto-memory)
+
 Persistent memory for [Claude Code](https://claude.ai/code) across sessions. Saves what you were working on, your preferences, and project context — and automatically restores it when you start a new session.
 
 ## How it works
